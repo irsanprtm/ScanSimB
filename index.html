@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checklist Perkantoran BMS (GEDUNG D & H)</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0d0d0d;
+    --white: #f7f5f0;
+    --accent: #1a5c3a;
+    --accent-light: #e8f5ee;
+    --danger: #8b1a1a;
+    --danger-light: #fdf0f0;
+    --warn: #7a4f00;
+    --warn-light: #fff8e7;
+    --border: #d0cdc6;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--white);
+    color: var(--black);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 380px;
+    border: 1.5px solid var(--black);
+    border-radius: 0;
+    padding: 2rem;
+    background: #fff;
+  }
+
+  .header-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+    border-bottom: 1.5px solid var(--black);
+    padding-bottom: 1rem;
+  }
+
+  .status-box {
+    padding: 1rem;
+    border: 1.5px solid var(--black);
+    margin-bottom: 1.25rem;
+    transition: all 0.3s;
+  }
+
+  .status-box.wait { background: var(--warn-light); border-color: #c4922a; }
+  .status-box.ok   { background: var(--accent-light); border-color: var(--accent); }
+  .status-box.fail { background: var(--danger-light); border-color: var(--danger); }
+
+  .status-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #666;
+  }
+
+  .status-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--black);
+  }
+
+  .dist-info {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #c4922a;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .btn-form {
+    display: block;
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    text-align: center;
+    padding: 14px;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: background 0.2s;
+    margin-top: 0.5rem;
+  }
+
+  .btn-form:hover { background: #154d30; }
+
+  .fail-msg {
+    font-size: 13px;
+    color: var(--danger);
+    margin-top: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .footer {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #aaa;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <p class="header-tag">PT / Perkantoran BMS — GEDUNG D & H</p>
+  <h1>Formulir Checklist Harian</h1>
+
+  <div id="status-box" class="status-box wait">
+    <p class="status-label">Status Lokasi</p>
+    <p class="status-text"><span class="spinner"></span> Mendeteksi GPS...</p>
+  </div>
+
+  <div id="dist-info" class="dist-info" style="display:none;"></div>
+  <div id="action"></div>
+
+  <div class="footer">
+    Sistem verifikasi GPS &bull; Radius maks. 80 meter &bull; BMS GEDUNG D & H
+  </div>
+</div>
+
+<script>
+// ============================================================
+// KONFIGURASI — edit nilai di bawah ini
+// ============================================================
+var OFFICE_LAT  = -6.1753924;   // Ganti dengan latitude kantor Anda
+var OFFICE_LNG  = 106.4997988;  // Ganti dengan longitude kantor Anda
+var RADIUS_M    = 80;           // Radius dalam meter
+var FORM_URL    = "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=kgupYJzwUEukD-w1U29LF1sD2I9tEQJLiC8FZLYcsWxUNlM1TEdCSUxDT0FHWTA2N0NWSkVHTzRSUS4u";
+// ============================================================
+
+function deg2rad(d) { return d * Math.PI / 180; }
+
+function haversine(la1, lo1, la2, lo2) {
+  var R = 6371000;
+  var dLat = deg2rad(la2 - la1);
+  var dLon = deg2rad(lo2 - lo1);
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(deg2rad(la1)) * Math.cos(deg2rad(la2)) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function setStatus(type, text) {
+  var box = document.getElementById('status-box');
+  box.className = 'status-box ' + type;
+  box.querySelector('.status-text').innerHTML = text;
+}
+
+function readUrlParams() {
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('lat') && params.get('lng')) {
+    OFFICE_LAT = parseFloat(params.get('lat'));
+    OFFICE_LNG = parseFloat(params.get('lng'));
+  }
+  if (params.get('r')) RADIUS_M = parseInt(params.get('r'));
+}
+
+readUrlParams();
+
+if (!navigator.geolocation) {
+  setStatus('fail', 'GPS tidak didukung browser ini.');
+} else {
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var uLat = pos.coords.latitude;
+    var uLng = pos.coords.longitude;
+    var dist = Math.round(haversine(uLat, uLng, OFFICE_LAT, OFFICE_LNG));
+    var acc  = Math.round(pos.coords.accuracy);
+
+    document.getElementById('dist-info').style.display = 'block';
+    document.getElementById('dist-info').textContent =
+      'Jarak: ' + dist + 'm dari kantor  |  Akurasi GPS: ±' + acc + 'm';
+
+    if (dist <= RADIUS_M) {
+      setStatus('ok', '&#10003; Lokasi terverifikasi');
+      document.getElementById('action').innerHTML =
+        '<a class="btn-form" href="' + FORM_URL + '" target="_blank">Buka Formulir Checklist &rarr;</a>';
+    } else {
+      setStatus('fail', 'Di luar radius kantor');
+      document.getElementById('action').innerHTML =
+        '<p class="fail-msg">Anda berada ' + dist + ' meter dari kantor.<br>' +
+        'Formulir hanya dapat diakses dalam radius ' + RADIUS_M + ' meter.<br>' +
+        'Pastikan Anda berada di dalam gedung kantor Balaraja.</p>';
+    }
+  }, function(e) {
+    var msg = 'Gagal mendapatkan lokasi GPS.';
+    if (e.code === 1) msg = 'Izin lokasi ditolak. Aktifkan GPS di pengaturan browser.';
+    else if (e.code === 2) msg = 'GPS tidak tersedia. Pastikan lokasi aktif.';
+    else if (e.code === 3) msg = 'Timeout. Buka Google Maps dulu agar GPS aktif, lalu scan ulang.';
+    setStatus('fail', msg);
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+}
+</script>
+
+</body>
+</html>
